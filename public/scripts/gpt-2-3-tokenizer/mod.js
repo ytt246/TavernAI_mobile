@@ -81,7 +81,8 @@ const bpe_ranks = dictZip(bpe_merges, range(0, bpe_merges.length))
 const cache = {}
 
 function bpe(token) {
-  if (Object.hasOwn(cache, token)) {
+  //if (Object.hasOwn(cache, token)) {
+  if (token in cache) { //legacy support
     return cache[token]
   }
 
@@ -107,7 +108,8 @@ function bpe(token) {
     }
     ))]
 
-    if (!(Object.hasOwn(bpe_ranks, bigram))) {
+    //if (!(Object.hasOwn(bpe_ranks, bigram))) {
+    if (!(bigram in bpe_ranks)) { //legacy support
       break
     }
 

@@ -1866,17 +1866,7 @@ label.checkbox :checked + span:after {
     }
 }
 
-@media screen and (max-width: 450px) {
-    html,
-    body {
-      margin: 0;
-      overflow-x: hidden;
-    }
-    .nav {
-      width: 100%;
-      box-shadow: none
-    }
-}
+
 
 
 
@@ -2244,4 +2234,67 @@ label.checkbox :checked + span:after {
 }
 #search_bar::placeholder  {
     color: white;
+}
+
+@media screen and (max-width: 450px) {
+    html,
+    body {
+      margin: 0;
+      overflow-x: hidden;
+    }
+    .nav {
+      width: 100%;
+      min-width: auto;
+      box-shadow: none
+    }
+    #bg_menu {
+        position: relative;
+    }
+    #chara_cloud{
+        width: 90%;
+        height: 100vh;
+        overflow: hidden;
+        overflow-y: scroll;
+        margin-left: 5%;/*170px;*/  
+    }
+    .characloud_character_block_card .avatar {
+        padding: 0px;
+        border-radius: 5px;
+        width: 150px;
+        height: 150px;
+        position: relative; /* make the avatar container position:relative */
+        overflow: hidden; /* hide the overflow of the box-shadow */
+    }
+    .characloud_characters_row {
+        position: relative;
+        overflow-x: scroll;
+        height: 240px;/*height: 345px;*/
+        margin-bottom: 35px;
+        background-color: #ffffff22;
+        padding: 8px;
+        padding-top: 30px;
+        border-radius: 10px;
+    }
+    .characloud_swipe_rigth, .characloud_swipe_left{
+        display: none;
+    }
+    .characloud_character_block_card{
+        height: 200px;
+        overflow-y: scroll;
+    }
+    .characloud_character_block_name{
+        bottom: 30px;
+    }
+    .characloud_character_block_description {
+        top: 75%;
+        font-size: 13px;
+        word-wrap: break-word;
+    }
+    #master_settings_toggle_block{
+        display: list-item;
+    }
+    #api_url_text, #api_key_novel, #api_key_openai {
+        font-size: 10pt;
+        width: 80%;
+    }
 }
