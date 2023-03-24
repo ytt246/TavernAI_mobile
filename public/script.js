@@ -221,7 +221,7 @@ $(document).ready(function(){
 
     $('#send_textarea').on('input', function () {
         
-        if($('#send_textarea').css('--autoresize') === 'true'){
+        if($('#send_textarea').css('--autoresize').trim() === 'true'){
             $('#send_textarea').attr('style', '');
             this.style.height =
                 (this.scrollHeight) + 'px';

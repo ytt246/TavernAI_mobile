@@ -722,11 +722,13 @@ display: none;
                         
 }
 
+
 #online_status {
     position: unset;
     margin-bottom: 0px;
     margin-left: 596px;
 }
+
 
 #online_status_indicator {
     width: 11px;
@@ -915,23 +917,6 @@ a {
     }
 }
 
-@media screen and (max-width: 450px) {
-    html,
-    body {
-        margin-left: auto;
-        margin-right: auto;
-        overflow-x: hidden; 
-	 
-    }
-	
-	#sheld {}
-	
-    .nav {
-        width: 100%;
-        box-shadow: none
-    }
-}
-
 /*chara cloud*/
 #bg_chara_cloud {
     display: none;
@@ -980,4 +965,48 @@ a {
 .edit_block div img {
     width: 20px;
     height: 20px;
+}
+
+@media screen and (max-width: 450px) {
+    html,
+    body {
+        margin-left: auto;
+        margin-right: auto;
+        overflow-x: hidden; 
+	 
+    }
+	
+	#sheld {}
+	
+    .nav {
+        width: 100%;
+        box-shadow: none
+    }
+
+    .mes_text {
+        font-size: 0.95em;
+        font-weight:400;
+        line-height:1.30rem;
+        padding-right: 40px;
+        padding-left: 0px;
+        padding-top: 0px;
+        padding-bottom:5px;
+        margin-left: 1px;
+    }
+
+    #chat_header {
+        color: rgb(207, 201, 191);
+        background: unset;
+        height: 50%;
+        border-style: solid;
+        border-width: 0 0 1px;
+        border-image: linear-gradient(to right, #ffffff05 0%, #ffffff15 1%, #ffffff15 99%, #ffffff05 100%) 1;
+        box-shadow: unset;
+    }
+
+    #online_status {
+        position: unset;
+        margin-bottom: 0px;
+        margin-left: 0px;
+    }
 }
