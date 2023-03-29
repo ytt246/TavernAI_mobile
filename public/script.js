@@ -1,4 +1,8 @@
 import {encode, decode} from "../scripts/gpt-2-3-tokenizer/mod.js";
+import {Notes} from "./class/Notes.mjs";
+import {WPP} from "./class/WPP.mjs";
+import {WPPEditor} from "./class/WPPEditor.mjs";
+
 $(document).ready(function(){
     /*
     const observer = new MutationObserver(function(mutations) {
@@ -164,6 +168,9 @@ $(document).ready(function(){
     var style_anchor = true;
     var character_anchor = true;
 
+    var winNotes;
+    var editorDescriptionWPP;
+
     var main_api = 'kobold';
     
     //novel settings
@@ -218,6 +225,21 @@ $(document).ready(function(){
             console.error(exception);
         }
     });
+
+    editorDescriptionWPP = new WPPEditor({
+        container: $('#description_wppeditor')[0],
+    });
+    editorDescriptionWPP.on("change", function(event) {
+        $("#description_textarea").val(event.target.text);
+
+        if(menu_type == 'create'){
+            create_save_description = $('#description_textarea').val();
+        }else{
+            if(timerSaveEdit) { clearTimeout(timerSaveEdit) };
+            timerSaveEdit = setTimeout(() => {$("#create_button").click();},durationSaveEdit);
+        }
+    }.bind(this));
+
 
     $('#send_textarea').on('input', function () {
         
@@ -779,7 +801,8 @@ $(document).ready(function(){
     });
     async function Generate(type) {//encode("dsfs").length
         let gap_holder = 120;
-        if(main_api === 'openai' && (model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301')) gap_holder = parseInt(amount_gen_openai);
+        if(main_api === 'openai' && (model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301' || model_openai === 'gpt-4' || model_openai === 'gpt-4-32k')) 
+            gap_holder = parseInt(amount_gen_openai);
         var textareaText = '';
         tokens_already_generated = 0;
         if(!free_char_name_mode){
@@ -855,8 +878,16 @@ $(document).ready(function(){
             var chatString = '';
             var arrMes = [];
             var mesSend = [];
-            var charDescription = $.trim(characters[this_chid].description);
+            var charDescription = characters[this_chid].description.replace(/\r/g, "");
             var charPersonality = $.trim(characters[this_chid].personality);
+
+            let wDesc = WPP.parseExtended(charDescription);
+            if(settings.notes && winNotes.strategy === "discr") {
+                charDescription = WPP.stringifyExtended(WPP.getMergedExtended(wDesc, winNotes.wppx), "line");
+            } else {
+                charDescription = WPP.stringifyExtended(wDesc, "line");
+            }
+            charDescription = $.trim(charDescription);
             var Scenario = $.trim(characters[this_chid].scenario);
             var mesExamples = $.trim(characters[this_chid].mes_example);
             var checkMesExample = $.trim(mesExamples.replace(/<START>/gi, ''));//for check length without tag
@@ -937,7 +968,7 @@ $(document).ready(function(){
             }
             
 
-            if(main_api === 'openai' && (model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301')){
+            if(main_api === 'openai' && (model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301' || model_openai === 'gpt-4' || model_openai === 'gpt-4-32k')){
                 let osp_string = openai_system_prompt.replace(/{{user}}/gi, name1) //System prompt for OpenAI
                                 .replace(/{{char}}/gi, name2)
                                 .replace(/<USER>/gi, name1)
@@ -1000,7 +1031,7 @@ $(document).ready(function(){
             }
             for (var item of chat2) {//console.log(encode("dsfs").length);
                 chatString = item+chatString;
-                if(encode(JSON.stringify(storyString+mesExmString+chatString+anchorTop+anchorBottom+charPersonality)).length+gap_holder < this_max_context){ //(The number of tokens in the entire prompt) need fix, it must count correctly (added +120, so that the description of the character does not hide)
+                if(getTokenCount(storyString+mesExmString+chatString+anchorTop+anchorBottom+charPersonality)+gap_holder < this_max_context){ //(The number of tokens in the entire prompt) need fix, it must count correctly (added +120, so that the description of the character does not hide)
                     arrMes[arrMes.length] = item;
                 }else{
                     i = chat2.length-1;
@@ -1016,7 +1047,7 @@ $(document).ready(function(){
                         for(let iii = 0; iii < mesExamplesArray.length; iii++){//mesExamplesArray It need to make from end to start
 
                             mesExmString = mesExmString+mesExamplesArray[iii];
-                            if(encode(JSON.stringify(storyString+mesExmString+chatString+anchorTop+anchorBottom+charPersonality)).length+gap_holder < this_max_context){ //example of dialogs
+                            if(getTokenCount(storyString+mesExmString+chatString+anchorTop+anchorBottom+charPersonality)+gap_holder < this_max_context){ //example of dialogs
                                 if(!is_pygmalion){
                                     mesExamplesArray[iii] = mesExamplesArray[iii].replace(/<START>/i, 'This is how '+name2+' should talk');//An example of how '+name2+' responds
                                 }
@@ -1078,7 +1109,7 @@ $(document).ready(function(){
                         }
                         
 
-                        if(!free_char_name_mode && !(main_api === 'openai' && (model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301'))){
+                        if(!free_char_name_mode && !(main_api === 'openai' && (model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301' || model_openai === 'gpt-4' || model_openai === 'gpt-4-32k'))){
                             if(i >= arrMes.length-1 && $.trim(item).substr(0, (name1+":").length) == name1+":"){//for add name2 when user sent
                                 item =item+name2+":";
                             }
@@ -1122,7 +1153,7 @@ $(document).ready(function(){
                 }
                 function checkPromtSize(){
                     setPromtString();
-                    let thisPromtContextSize = encode(JSON.stringify(storyString+mesExmString+mesSendString+anchorTop+anchorBottom+charPersonality+generatedPromtCache)).length+gap_holder;
+                    let thisPromtContextSize = getTokenCount(storyString+mesExmString+mesSendString+anchorTop+anchorBottom+charPersonality+generatedPromtCache)+gap_holder;
                     if(thisPromtContextSize > this_max_context){
                         if(count_exm_add > 0 && !keep_dialog_examples){
                             //mesExamplesArray.length = mesExamplesArray.length-1;
@@ -1150,7 +1181,7 @@ $(document).ready(function(){
                 }else{
                     mesSendString = '<START>\n'+mesSendString;
                 }
-                if(main_api === 'openai' && (model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301')){
+                if(main_api === 'openai' && (model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301' || model_openai === 'gpt-4' || model_openai === 'gpt-4-32k')){
                     finalPromt = {};
                     finalPromt = [];
                     
@@ -1183,16 +1214,20 @@ $(document).ready(function(){
                 }
                 var this_max_gen = this_amount_gen;
                 if(multigen && (main_api === 'kobold' || main_api === 'novel')){ //Multigen is not necessary for OpenAI (Uses stop tokens)
+                    
+                    let this_set_context_size;
+                    if(main_api === 'kobold') this_set_context_size = parseInt(amount_gen);
+                    if(main_api === 'novel') this_set_context_size = parseInt(amount_gen_novel);
                     if(tokens_already_generated === 0){
-                        if(parseInt(amount_gen) >= tokens_first_request_count){
+                        if(this_set_context_size >= tokens_first_request_count){
                             this_amount_gen = tokens_first_request_count;
                         }else{
-                            this_amount_gen = parseInt(amount_gen);
+                            this_amount_gen = this_set_context_size;
                         }
 
                     }else{
                         if(parseInt(amount_gen) - tokens_already_generated < tokens_cycle_count){
-                            this_amount_gen = parseInt(amount_gen) - tokens_already_generated;
+                            this_amount_gen = this_set_context_size - tokens_already_generated;
                         }else{
                             this_amount_gen = tokens_cycle_count;
                         }
@@ -1268,7 +1303,7 @@ $(document).ready(function(){
                         "max_tokens": this_amount_gen
                     };
                     
-                    if((model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301')){
+                    if((model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301' || model_openai === 'gpt-4' || model_openai === 'gpt-4-32k')){
                         generate_data.messages = finalPromt;
                     }else{
                         generate_data.prompt = finalPromt;
@@ -1311,7 +1346,7 @@ $(document).ready(function(){
                                 getMessage = data.output;
                             }
                             if(main_api == 'openai'){
-                                if(model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301'){
+                                if(model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301' || model_openai === 'gpt-4' || model_openai === 'gpt-4-32k'){
                                     getMessage = data.choices[0].message.content;
                                 }else{
                                     getMessage = data.choices[0].text;
@@ -1432,7 +1467,7 @@ $(document).ready(function(){
                 }
             }
         });
-        var save_chat = [{user_name:default_user_name, character_name:name2,create_date: chat_create_date}, ...chat];
+        var save_chat = [{user_name:default_user_name, character_name:name2,create_date: chat_create_date, notes: winNotes.text, notes_type: winNotes.strategy}, ...chat];
 
         jQuery.ajax({    
             type: 'POST', 
@@ -1477,6 +1512,18 @@ $(document).ready(function(){
                     }
                     //chat =  data;
                     chat_create_date = chat[0]['create_date'];
+                    winNotes.text = chat[0].notes || "";
+                    winNotes.strategy = chat[0].notes_type || "discr";
+                    if(!winNotes.text || !winNotes.text.length) {
+                        let defaultWpp = '[Character("'+characters[this_chid].name+'"){}]';
+                        try {
+                            let parsed = WPP.parse(characters[this_chid].description);
+                            if(parsed[0] && parsed[0].type && parsed[0].type.length && parsed[0].name && parsed[0].name.length) {
+                                defaultWpp = '[' + parsed[0].type + '("' + parsed[0].name + '"){}]';
+                            }
+                        } catch(e) { /* ignore error */ }
+                        winNotes.wppText = defaultWpp;
+                    }
                     chat.shift();
 
                 }else{
@@ -1614,7 +1661,13 @@ $(document).ready(function(){
         
         $( "#rm_button_selected_ch" ).children("h2").removeClass('seleced_button_style');
         $( "#rm_button_selected_ch" ).children("h2").addClass('deselected_button_style');
-        
+
+        // Reset W++ editor
+        document.getElementById("description_wpp_checkbox").checked = false;
+        document.getElementById("description_textarea").style.display = null;
+        document.getElementById("description_wppeditor").style.display = "none";
+        editorDescriptionWPP.clear();
+        editorDescriptionWPP.text = "";
 
         //create text poles
         $("#rm_button_back").css("display", "inline-block");
@@ -1682,6 +1735,10 @@ $(document).ready(function(){
         
     }
 
+    function getTokenCount(text = "") {
+        return encode(JSON.stringify(text)).length;
+    }
+
     function select_selected_character(chid){ //character select
 
         select_rm_create();
@@ -1721,6 +1778,10 @@ $(document).ready(function(){
         $("#avatar_url_pole").val(characters[chid].avatar);
         $("#chat_import_avatar_url").val(characters[chid].avatar);
         $("#chat_import_character_name").val(characters[chid].name);
+
+        editorDescriptionWPP.clear();
+        editorDescriptionWPP.text = characters[chid].description;
+
         //$("#avatar_div").css("display", "none");
         var this_avatar = default_avatar;
         if(characters[chid].avatar != 'none'){
@@ -2010,7 +2071,22 @@ $(document).ready(function(){
             $('#master_settings_popup').css('display', 'none');
         }
     });
-
+    $('#option_toggle_notes').click(function() {
+        showHideNotes();
+    });
+    $('#notes_wpp_cross').click(function() {
+        showHideNotes();
+    });
+    function showHideNotes(){
+        if(winNotes.shown){
+            $('#shadow_notes_popup').transition({ opacity: 0.0 ,duration: animation_rm_duration, easing:animation_rm_easing, complete: function(){
+                winNotes.hide();
+            }});
+        }else{
+            $('#shadow_notes_popup').transition({ opacity: 0.0 ,duration: 1, easing:animation_rm_easing});
+            $('#shadow_notes_popup').transition({ opacity: 1.0 ,duration: animation_rm_duration, easing:animation_rm_easing});
+        }
+    }
     $("#dialogue_popup_ok").click(function(){
         $("#shadow_popup").css('display', 'none');
         $("#shadow_popup").css('opacity:', 0.0);
@@ -2282,7 +2358,7 @@ $(document).ready(function(){
                     $("#add_avatar_button").replaceWith($("#add_avatar_button").val('').clone(true));
                     $('#create_button').attr('value','Save');
 
-                    var count_tokens = encode(JSON.stringify(characters[this_chid].description+characters[this_chid].personality+characters[this_chid].scenario+characters[this_chid].mes_example)).length;
+                    var count_tokens = getTokenCount(characters[this_chid].description+characters[this_chid].personality+characters[this_chid].scenario+characters[this_chid].mes_example);
                     if(count_tokens < 1024){
                         $('#result_info').html(count_tokens+" Tokens");
                     }else{
@@ -2318,13 +2394,17 @@ $(document).ready(function(){
         }
 
     });
-    $('#description_textarea').on('keyup paste cut', function(){//change keyup paste cut
-        if(menu_type == 'create'){
+    $('#description_textarea').on('keyup paste cut', function(){
+        if(menu_type === 'create'){
             create_save_description = $('#description_textarea').val();
         }else{
+            editorDescriptionWPP.text = $('#description_textarea').val();
+            if(timerSaveEdit) { clearTimeout(timerSaveEdit) };
             timerSaveEdit = setTimeout(() => {$("#create_button").click();},durationSaveEdit);
         }
-
+    });
+    $('#notes_textarea').on('keyup paste cut', function(){
+        
     });
     $('#personality_textarea').on('keyup paste cut', function(){
         if(menu_type == 'create'){
@@ -2499,7 +2579,6 @@ $(document).ready(function(){
         $("#chat").children().filter('[mesid="'+(count_view_mes-1)+'"]').children('.swipe_right').css('display', 'none');
         $("#chat").children().filter('[mesid="'+(count_view_mes-1)+'"]').children('.swipe_left').css('display', 'none');
     }
-    
     $( "#settings_perset" ).change(function() {
 
         if($('#settings_perset').find(":selected").val() != 'gui'){
@@ -2834,6 +2913,11 @@ $(document).ready(function(){
         singleline = !!$('#singleline').prop('checked');
         saveSettings();
     });
+    $('#notes_checkbox').change(function() {
+        settings.notes = !!$('#notes_checkbox').prop('checked');
+        $("#option_toggle_notes").css("display", settings.notes ? "block" : "none");
+        saveSettings();
+    });
     $('#autoconnect').change(function() {
         settings.auto_connect = !!$('#autoconnect').prop('checked');
         saveSettings();
@@ -2859,7 +2943,37 @@ $(document).ready(function(){
         free_char_name_mode = !!$('#free_char_name_mode').prop('checked');
         saveSettings();
     });
-    
+
+    document.getElementById("description_wppeditor").style.display = "none";
+    document.getElementById("description_wpp_checkbox").checked = false;
+    $('#description_wpp_checkbox').change(function() {
+        if($('#description_wpp_checkbox').prop('checked')) {
+            document.getElementById("description_wppeditor").style.display = null;
+            document.getElementById("description_textarea").style.display = "none";
+            $('#description_wppeditor').css('opacity', 0.0);
+            $('#description_wppeditor').transition({ opacity: 1.0 ,duration: 410, easing:animation_rm_easing});
+            
+        } else {
+            document.getElementById("description_textarea").style.display = null;
+            document.getElementById("description_wppeditor").style.display = "none";
+            $('#description_textarea').css('opacity', 0.0);
+            $('#description_textarea').transition({ opacity: 1.0 ,duration: 410, easing:animation_rm_easing});
+        }
+    });
+    $('#notes_wpp_checkbox').change(function() {
+        if($('#notes_wpp_checkbox').prop('checked')) {
+            document.getElementById("notes_wpp_editor").style.display = null;
+            document.getElementById("notes_textarea").style.display = "none";
+            $('#notes_wpp_editor').css('opacity', 0.0);
+            $('#notes_wpp_editor').transition({ opacity: 1.0 ,duration: 410, easing:animation_rm_easing});
+            
+        } else {
+            document.getElementById("notes_textarea").style.display = null;
+            document.getElementById("notes_wpp_editor").style.display = "none";
+            $('#notes_textarea').css('opacity', 0.0);
+            $('#notes_textarea').transition({ opacity: 1.0 ,duration: 410, easing:animation_rm_easing});
+        }
+    });
 
     //Novel
     $(document).on('input', '#temp_novel', function() {
@@ -3037,7 +3151,7 @@ $(document).ready(function(){
 
                         $('#style_menu').append('<div class="style_button" style_id="'+i+'" id="style_button'+i+'" alt="'+item+'"><img src="../designs/'+item.replace('.css', '.png')+'"></div>');
                     });
-                    //Novel
+                    
                     if(settings.main_api != undefined){
                         main_api = settings.main_api;
                         $("#main_api option[value="+main_api+"]").attr('selected', 'true');
@@ -3056,8 +3170,10 @@ $(document).ready(function(){
                         $("#openai_system_prompt_textarea").val(openai_system_prompt);
                     }
                     model_openai = settings.model_openai;
-                    $('#model_openai_select option[value="'+model_openai+'"]').attr('selected', 'true');;
+                    $('#model_openai_select option[value="'+model_openai+'"]').attr('selected', 'true');
+                    openAIChangeMaxContextForModels();
                     
+                    //Novel
                     model_novel = settings.model_novel;
                     $('#model_novel_select option[value="'+model_novel+'"]').attr('selected', 'true');
 
@@ -3272,7 +3388,13 @@ $(document).ready(function(){
                     free_char_name_mode = !!settings.free_char_name_mode;
                     settings.auto_connect = settings.auto_connect === false ? false : true;
                     settings.characloud = settings.characloud === false ? false : true;
-                    
+                    settings.notes = settings.notes === false ? false : true;
+
+                    winNotes = new Notes({
+                        root: document.getElementById("shadow_notes_popup"),
+                        save: saveChat.bind(this)
+                    });
+
                     $('#style_anchor').prop('checked', style_anchor);
                     $('#character_anchor').prop('checked', character_anchor);
                     $('#lock_context_size').prop('checked', lock_context_size);
@@ -3280,9 +3402,12 @@ $(document).ready(function(){
                     $('#singleline').prop('checked', singleline);
                     $('#autoconnect').prop('checked', settings.auto_connect);
                     $('#characloud').prop('checked', settings.characloud);
+                    $('#notes_checkbox').prop('checked', settings.notes);
                     $('#swipes').prop('checked', swipes);
                     $('#keep_dialog_examples').prop('checked', keep_dialog_examples);
                     $('#free_char_name_mode').prop('checked', free_char_name_mode);
+
+                    $("#option_toggle_notes").css("display", settings.notes ? "block" : "none");
                     
                     $("#anchor_order option[value="+anchor_order+"]").attr('selected', 'true');
                     $("#pygmalion_formating option[value="+pygmalion_formating+"]").attr('selected', 'true');
@@ -3422,6 +3547,7 @@ $(document).ready(function(){
                     auto_connect: settings.auto_connect || false,
                     characloud: settings.characloud === false ? false : true,
                     swipes: swipes,
+                    notes: settings.notes || false,
                     keep_dialog_examples: keep_dialog_examples,
                     free_char_name_mode: free_char_name_mode,
                     main_api: main_api,
@@ -4133,8 +4259,33 @@ $(document).ready(function(){
     });
     $( "#model_openai_select" ).change(function() {
         model_openai = $('#model_openai_select').find(":selected").val();
+        openAIChangeMaxContextForModels();
         saveSettings();
     });
+    function openAIChangeMaxContextForModels(){
+        let this_openai_max_context;
+        switch(model_openai){
+            case 'gpt-4':
+                this_openai_max_context = 8192;
+                break;
+            case 'gpt-4-32k':
+                this_openai_max_context = 32768;
+                break;
+            case 'code-davinci-002':
+                this_openai_max_context = 8000;
+                break;
+            default:
+                this_openai_max_context = 4096;
+                break;
+        }
+        $('#max_context_openai').attr('max', this_openai_max_context);
+        if(max_context_openai > this_openai_max_context){
+            max_context_openai = this_openai_max_context;
+        }
+        $('#max_context_openai').val(max_context_openai);
+        $('#max_context_counter_openai').html(max_context_openai+' Tokens');
+        
+    }
     $( "#anchor_order" ).change(function() {
         anchor_order = parseInt($('#anchor_order').find(":selected").val());
         saveSettings();
@@ -4414,6 +4565,99 @@ $(document).ready(function(){
     });
 
     characloud_characters_rows = [];
+
+    let charaCloudSwipeLeft = function(){
+        const this_row_id = $(this).parent().attr('characloud_row_id');
+        const this_width = parseInt($(this).parent().children('.characloud_characters_row_scroll').css('width'))-parseInt($('#characloud_characters_row'+this_row_id).css('width'));
+        let move_x = 820;
+        $(this).parent().lazyLoadXT({edgeX:1000, edgeY:500});
+        if(characloud_characters_rows[this_row_id] != 0){
+            if($(this).parent().children('.characloud_swipe_rigth').css('display') == 'none'){
+                $(this).parent().children('.characloud_swipe_rigth').css('display', 'flex');
+                $(this).parent().children('.characloud_swipe_rigth').transition({
+                    opacity: 1.0,
+                    duration: 300,
+                    easing: animation_rm_easing,
+                    queue: false,
+                    complete: function() {
+                    }
+                });
+            }
+            if(Math.abs(characloud_characters_rows[this_row_id])-move_x <= 0){
+                $(this).transition({
+                    opacity: 0.0,
+                    duration: 700,
+                    easing: animation_rm_easing,
+                    queue: false,
+                    complete: function() {
+                        $(this).css('display', 'none');
+                    }
+                });
+                characloud_characters_rows[this_row_id] = 0;
+            }else{
+                characloud_characters_rows[this_row_id] += move_x;
+            }
+            $(this).parent().children('.characloud_characters_row_scroll').transition({
+                x: characloud_characters_rows[this_row_id],
+                duration: 300,
+                easing: animation_rm_easing,
+                queue: false,
+                complete: function() {
+
+                }
+            });
+        } else {
+            $(this).css("opacity", "0");
+        }
+    };
+    let charaCloudSwipeRight = function(){
+        const this_row_id = $(this).parent().attr('characloud_row_id');
+        const this_width = parseInt($(this).parent().children('.characloud_characters_row_scroll').css('width'))-parseInt($('#characloud_characters_row'+this_row_id).css('width'));
+
+        let move_x = 820;
+        $(this).parent().lazyLoadXT({edgeX:1000, edgeY:500});
+        if(characloud_characters_rows[this_row_id] != this_width*-1 && parseInt($(this).parent().css('width')) < parseInt($(this).parent().children('.characloud_characters_row_scroll').css('width'))){
+            if($(this).parent().children('.characloud_swipe_left').css('display') == 'none'){
+                $(this).parent().children('.characloud_swipe_left').css('display', 'flex');
+                $(this).parent().children('.characloud_swipe_left').transition({
+                    opacity: 1.0,
+                    duration: 300,
+                    easing: animation_rm_easing,
+                    queue: false,
+                    complete: function() {
+                    }
+                });
+            }
+            if(Math.abs(characloud_characters_rows[this_row_id])+move_x >= this_width){
+                characloud_characters_rows[this_row_id] = this_width*-1;
+                $(this).transition({
+                    opacity: 0.0,
+                    duration: 700,
+                    easing: animation_rm_easing,
+                    queue: false,
+                    complete: function() {
+                        $(this).css('display', 'none');
+                    }
+                });
+            }else{
+                characloud_characters_rows[this_row_id] -= move_x;
+
+            }
+
+            $(this).parent().children('.characloud_characters_row_scroll').transition({
+                x: characloud_characters_rows[this_row_id],
+                duration: 400,
+                easing: animation_rm_easing,
+                queue: false,
+                complete: function() {
+
+                }
+            });
+        } else {
+            $(this).css("opacity", "0");
+        }
+    };
+
     async function charaCloudInit(){
         if(settings.characloud){
             charaCloudServerStatus();
@@ -4444,6 +4688,22 @@ $(document).ready(function(){
                     characloud_characters_rows[row_i] = 0;
                     $('#characloud_characters').append('<div class="characloud_characters_category_title">'+category_title+'</div><div characloud_row_id="'+row_i+'" id="characloud_characters_row'+row_i+'" class="characloud_characters_row"><div class="characloud_swipe_rigth"><img src="img/swipe_right.png"></div><div class="characloud_swipe_left"><img src="img/swipe_left.png"></div></div>');
                     $('#characloud_characters_row'+row_i).append('<div class="characloud_characters_row_scroll"></div>');
+
+                    let row = $('#characloud_characters_row'+row_i);
+                    row[0].addEventListener("wheel", function(event) {
+                        if(!event.deltaX || row.sleeping) { return; }
+                        if(event.deltaX > 0) {
+                            row.sleeping = true;
+                            charaCloudSwipeRight.call(row.find(".characloud_swipe_rigth"));
+                        } else {
+                            row.sleeping = true;
+                            charaCloudSwipeLeft.call(row.find(".characloud_swipe_left"));
+                        }
+                        setTimeout(function() {
+                            row.sleeping = false;
+                        }, 150);
+                    });
+
                     characloud_characters_board[category].forEach(function(item, i){
 
                         $('#characloud_characters_row'+row_i).children('.characloud_characters_row_scroll').append('<div id="characloud_character_block'+char_i+'" chid="'+char_i+'" class="characloud_character_block"><div class="characloud_character_block_card"><div class="avatar"><img data-src="'+charaCloudServer+'/cards/'+item.public_id+'.webp" class="lazy"></div><div class="characloud_character_block_name">'+item.name+'</div><div class="characloud_character_block_description">'+'</div></div></div>');
@@ -4486,96 +4746,8 @@ $(document).ready(function(){
         $(this).lazyLoadXT({edgeX:500, edgeY:500});
         is_lazy_load = true;
     }
-    $(document).on('click', '.characloud_swipe_rigth', function(){
-        const this_row_id = $(this).parent().attr('characloud_row_id');
-        const this_width = parseInt($(this).parent().children('.characloud_characters_row_scroll').css('width'))-parseInt($('#characloud_characters_row'+this_row_id).css('width'));
-
-        
-        let move_x = 820;
-        $(this).parent().lazyLoadXT({edgeX:1000, edgeY:500});
-        if(characloud_characters_rows[this_row_id] != this_width*-1 && parseInt($(this).parent().css('width')) < parseInt($(this).parent().children('.characloud_characters_row_scroll').css('width'))){
-            if($(this).parent().children('.characloud_swipe_left').css('display') == 'none'){
-                $(this).parent().children('.characloud_swipe_left').css('display', 'flex');
-                $(this).parent().children('.characloud_swipe_left').transition({ 
-                    opacity: 1.0,
-                    duration: 300,
-                    easing: animation_rm_easing,
-                    queue: false,
-                    complete: function() {
-                    }
-                });
-            }
-            if(Math.abs(characloud_characters_rows[this_row_id])+move_x >= this_width){
-                characloud_characters_rows[this_row_id] = this_width*-1;
-                $(this).transition({ 
-                    opacity: 0.0,
-                    duration: 700,
-                    easing: animation_rm_easing,
-                    queue: false,
-                    complete: function() {
-                        $(this).css('display', 'none');
-                    }
-                });
-            }else{
-                characloud_characters_rows[this_row_id] -= move_x;
-                
-            }
-
-            $(this).parent().children('.characloud_characters_row_scroll').transition({ 
-                        x: characloud_characters_rows[this_row_id],
-                        duration: 400,
-                        easing: animation_rm_easing,
-                        queue: false,
-                        complete: function() {
-
-                        }
-            });
-        }
-    });
-    $(document).on('click', '.characloud_swipe_left', function(){
-        const this_row_id = $(this).parent().attr('characloud_row_id');
-        const this_width = parseInt($(this).parent().children('.characloud_characters_row_scroll').css('width'))-parseInt($('#characloud_characters_row'+this_row_id).css('width'));
-
-        
-        let move_x = 820;
-        $(this).parent().lazyLoadXT({edgeX:1000, edgeY:500});
-        if(characloud_characters_rows[this_row_id] != 0){
-            if($(this).parent().children('.characloud_swipe_rigth').css('display') == 'none'){
-                $(this).parent().children('.characloud_swipe_rigth').css('display', 'flex');
-                $(this).parent().children('.characloud_swipe_rigth').transition({ 
-                    opacity: 1.0,
-                    duration: 300,
-                    easing: animation_rm_easing,
-                    queue: false,
-                    complete: function() {
-                    }
-                });
-            }
-            if(Math.abs(characloud_characters_rows[this_row_id])-move_x <= 0){
-                $(this).transition({ 
-                    opacity: 0.0,
-                    duration: 700,
-                    easing: animation_rm_easing,
-                    queue: false,
-                    complete: function() {
-                        $(this).css('display', 'none');
-                    }
-                });
-                characloud_characters_rows[this_row_id] = 0;
-            }else{
-                characloud_characters_rows[this_row_id] += move_x;
-            }
-            $(this).parent().children('.characloud_characters_row_scroll').transition({ 
-                        x: characloud_characters_rows[this_row_id],
-                        duration: 300,
-                        easing: animation_rm_easing,
-                        queue: false,
-                        complete: function() {
-
-                        }
-            });
-        }
-    });
+    $(document).on('click', '.characloud_swipe_rigth', charaCloudSwipeRight);
+    $(document).on('click', '.characloud_swipe_left', charaCloudSwipeLeft);
     
     //select character
     $(document).on('click', '.characloud_character_block_card', function(){
@@ -4656,6 +4828,16 @@ $(document).ready(function(){
         $('#characloud_search_block').css('display', 'none');
         $('#characloud_characters').css('display', 'block');
     });
+    if(document.getElementById("nav-toggle").checked) {
+        is_nav_toggle = true;
+        $('#chara_cloud').transition({
+            width: "calc(100vw - 610px)",
+            duration: 140,
+            delay: 20,
+            easing: "ease-in-out",
+            complete: function() {  }
+        });
+    }
     $('.nav-toggle').click(function(){
         if(!is_nav_toggle){
             is_nav_toggle = true;
