@@ -1009,4 +1009,19 @@ a {
         margin-bottom: 0px;
         margin-left: 0px;
     }
+
+.modular .container {
+    background: rgba(36,37,37,1.00);
+}
+
+#notes_popup textarea {
+    background-color: #ffffff00;
+}
+
+#notes_popup div.wpp-editor {
+    background-color: #ffffff00;
+}
+
+#description_wppeditor {
+      background-color: #ffffff00;
 }
